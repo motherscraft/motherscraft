@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useStore } from './StoreContext';
 import { 
   ShoppingBag, Heart, Search, User, Menu, X, ChevronLeft, ChevronRight, 
   Star, ArrowRight, Check, Plus, Minus, ArrowUp, Compass, 
@@ -573,6 +574,9 @@ let toastCounter = 0;
 let cartIdCounter = 0;
 
 export default function MothersCraft() {
+  const { products, settings, addOrder, coupons, setActiveTab } = useStore();
+  const PRODUCTS = products.filter(p => p.status === 'published');
+
   // ============================================================================
   // 2. CENTRAL STATE ENGINE
   // ============================================================================
@@ -580,6 +584,14 @@ export default function MothersCraft() {
   // Core Arrays (No localStorage or sessionStorage)
   const [cartItems, setCartItems] = useState([]);
   const [wishlistItems, setWishlistItems] = useState([]);
+
+  // Checkout modal state
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutName, setCheckoutName] = useState("");
+  const [checkoutEmail, setCheckoutEmail] = useState("");
+  const [checkoutPhone, setCheckoutPhone] = useState("");
+  const [checkoutAddress, setCheckoutAddress] = useState("");
+  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState("UPI");
 
   // UI Navigation & Modals
   const [view, setView] = useState({ page: 'home', productId: null });
@@ -775,11 +787,18 @@ export default function MothersCraft() {
   // Apply Coupon code
   const handleApplyCoupon = (e) => {
     e.preventDefault();
-    if (couponCode.trim().toUpperCase() === "CRAFT10") {
-      setAppliedCoupon("CRAFT10");
-      addToast("✓ Coupon CRAFT10 applied!");
+    const enteredCode = couponCode.trim().toUpperCase();
+    const coupon = coupons?.find(c => c.code.toUpperCase() === enteredCode && c.active);
+    if (coupon) {
+      const subtotal = getCartSubtotal();
+      if (subtotal < coupon.minOrder) {
+        addToast(`Min. order of ₹${coupon.minOrder} required for this coupon.`);
+      } else {
+        setAppliedCoupon(enteredCode);
+        addToast(`✓ Coupon ${enteredCode} applied!`);
+      }
     } else {
-      addToast("Invalid Coupon Code");
+      addToast("Invalid or expired coupon code.");
     }
   };
 
@@ -928,7 +947,7 @@ export default function MothersCraft() {
               style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}
             >
               <img 
-                src="/logo.jpg" 
+                src="/logo.jpg?v=3" 
                 alt="Mothers Craft Logo" 
                 style={{ 
                   height: '44px', 
@@ -939,7 +958,7 @@ export default function MothersCraft() {
                 }} 
               />
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{
+                <span className="logo-title" style={{
                   fontFamily: "'Playfair Display', serif",
                   fontSize: '24px',
                   fontWeight: '700',
@@ -947,9 +966,9 @@ export default function MothersCraft() {
                   color: 'var(--mahogany)',
                   lineHeight: '1'
                 }}>
-                  Mothers Craft
+                  {settings?.storeName ?? 'Mothers Craft'}
                 </span>
-                <span style={{
+                <span className="logo-tagline" style={{
                   fontFamily: "'Inter', sans-serif",
                   fontSize: '9px',
                   color: 'var(--terracotta)',
@@ -957,7 +976,7 @@ export default function MothersCraft() {
                   textTransform: 'uppercase',
                   marginTop: '2px'
                 }}>
-                  Handmade Home Decor
+                  {settings?.tagline ?? 'Handmade Home Decor'}
                 </span>
               </div>
             </div>
@@ -1104,6 +1123,7 @@ export default function MothersCraft() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', color: 'var(--espresso)' }}>
             <button 
               onClick={() => setSearchOpen(true)}
+              className="desktop-only"
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '6px' }}
               aria-label="Search"
             >
@@ -1118,6 +1138,7 @@ export default function MothersCraft() {
                   addToast(`Your wishlist has ${wishlistItems.length} items`);
                 }
               }}
+              className="desktop-only"
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '6px', position: 'relative' }}
               aria-label="Wishlist"
             >
@@ -1144,7 +1165,7 @@ export default function MothersCraft() {
             </button>
 
             <button 
-              onClick={() => addToast("Profile features coming soon!")}
+              onClick={() => setActiveTab('admin')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '6px' }}
               aria-label="Account Profile"
             >
@@ -1153,6 +1174,7 @@ export default function MothersCraft() {
 
             <button 
               onClick={() => setCartOpen(true)}
+              className="desktop-only"
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '6px', position: 'relative' }}
               aria-label="Shopping Cart"
             >
@@ -2738,7 +2760,7 @@ export default function MothersCraft() {
           </p>
 
           {!newsletterSuccess ? (
-            <form onSubmit={handleNewsSubmit} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <form onSubmit={handleNewsSubmit} className="newsletter-form" style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
               <input 
                 type="email"
                 placeholder="Enter your email address"
@@ -2811,42 +2833,84 @@ export default function MothersCraft() {
           <div className="responsive-grid-2" style={{ gap: '48px', marginBottom: '60px' }}>
             {/* Left: Product Images with Switcher */}
             <div>
-              <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-warm)', marginBottom: '16px' }}>
-                <img 
-                  src={detailThumbIndex === 0 ? product.image1 : product.image2} 
-                  alt={product.name} 
-                  style={{ width: '100%', height: '500px', objectFit: 'cover' }} 
-                />
+              <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-warm)', marginBottom: '16px', backgroundColor: '#000' }}>
+                {(() => {
+                  const mediaItems = [];
+                  if (product.image1) mediaItems.push({ type: 'image', url: product.image1 });
+                  if (product.image2) mediaItems.push({ type: 'image', url: product.image2 });
+                  if (product.image3) mediaItems.push({ type: 'image', url: product.image3 });
+                  if (product.image4) mediaItems.push({ type: 'image', url: product.image4 });
+                  if (product.image5) mediaItems.push({ type: 'image', url: product.image5 });
+                  if (product.image6) mediaItems.push({ type: 'image', url: product.image6 });
+                  if (product.image7) mediaItems.push({ type: 'image', url: product.image7 });
+                  if (product.image8) mediaItems.push({ type: 'image', url: product.image8 });
+                  if (product.video) mediaItems.push({ type: 'video', url: product.video });
+
+                  const activeMedia = mediaItems[detailThumbIndex] || mediaItems[0];
+                  if (!activeMedia) return <div style={{ height: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>No Media</div>;
+
+                  return (
+                    <div>
+                      {activeMedia.type === 'video' ? (
+                        <video 
+                          src={activeMedia.url} 
+                          controls 
+                          style={{ width: '100%', height: '500px', objectFit: 'contain' }} 
+                        />
+                      ) : (
+                        <img 
+                          src={activeMedia.url} 
+                          alt={product.name} 
+                          style={{ width: '100%', height: '500px', objectFit: 'cover' }} 
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Thumbnails strip */}
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <img 
-                  src={product.image1} 
-                  alt="" 
-                  onClick={() => setDetailThumbIndex(0)}
-                  style={{
-                    width: '80px',
-                    height: '80px',
-                    objectFit: 'cover',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    border: detailThumbIndex === 0 ? '2px solid var(--gold)' : '1px solid var(--border-warm)'
-                  }}
-                />
-                <img 
-                  src={product.image2} 
-                  alt="" 
-                  onClick={() => setDetailThumbIndex(1)}
-                  style={{
-                    width: '80px',
-                    height: '80px',
-                    objectFit: 'cover',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    border: detailThumbIndex === 1 ? '2px solid var(--gold)' : '1px solid var(--border-warm)'
-                  }}
-                />
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                {(() => {
+                  const mediaItems = [];
+                  if (product.image1) mediaItems.push({ type: 'image', url: product.image1 });
+                  if (product.image2) mediaItems.push({ type: 'image', url: product.image2 });
+                  if (product.image3) mediaItems.push({ type: 'image', url: product.image3 });
+                  if (product.image4) mediaItems.push({ type: 'image', url: product.image4 });
+                  if (product.image5) mediaItems.push({ type: 'image', url: product.image5 });
+                  if (product.image6) mediaItems.push({ type: 'image', url: product.image6 });
+                  if (product.image7) mediaItems.push({ type: 'image', url: product.image7 });
+                  if (product.image8) mediaItems.push({ type: 'image', url: product.image8 });
+                  if (product.video) mediaItems.push({ type: 'video', url: product.video });
+
+                  return mediaItems.map((item, idx) => (
+                    <div 
+                      key={idx}
+                      onClick={() => setDetailThumbIndex(idx)}
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        border: (detailThumbIndex === idx || (detailThumbIndex >= mediaItems.length && idx === 0)) ? '2px solid var(--gold)' : '1px solid var(--border-warm)'
+                      }}
+                    >
+                      {item.type === 'video' ? (
+                        <div style={{ width: '100%', height: '100%', backgroundColor: 'var(--espresso)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontSize: '24px' }}>🎥</span>
+                        </div>
+                      ) : (
+                        <img 
+                          src={item.url} 
+                          alt="" 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      )}
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
 
@@ -3112,40 +3176,82 @@ export default function MothersCraft() {
           <div style={{ display: 'flex', width: '100%', flexWrap: 'wrap' }}>
             {/* Left side: Images */}
             <div style={{ flex: '1 1 400px', padding: '24px' }}>
-              <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-warm)', marginBottom: '12px' }}>
-                <img 
-                  src={quickThumbIndex === 0 ? quickViewProduct.image1 : quickViewProduct.image2} 
-                  alt={quickViewProduct.name} 
-                  style={{ width: '100%', height: '360px', objectFit: 'cover' }} 
-                />
+              <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-warm)', marginBottom: '12px', backgroundColor: '#000' }}>
+                {(() => {
+                  const mediaItems = [];
+                  if (quickViewProduct.image1) mediaItems.push({ type: 'image', url: quickViewProduct.image1 });
+                  if (quickViewProduct.image2) mediaItems.push({ type: 'image', url: quickViewProduct.image2 });
+                  if (quickViewProduct.image3) mediaItems.push({ type: 'image', url: quickViewProduct.image3 });
+                  if (quickViewProduct.image4) mediaItems.push({ type: 'image', url: quickViewProduct.image4 });
+                  if (quickViewProduct.image5) mediaItems.push({ type: 'image', url: quickViewProduct.image5 });
+                  if (quickViewProduct.image6) mediaItems.push({ type: 'image', url: quickViewProduct.image6 });
+                  if (quickViewProduct.image7) mediaItems.push({ type: 'image', url: quickViewProduct.image7 });
+                  if (quickViewProduct.image8) mediaItems.push({ type: 'image', url: quickViewProduct.image8 });
+                  if (quickViewProduct.video) mediaItems.push({ type: 'video', url: quickViewProduct.video });
+
+                  const activeMedia = mediaItems[quickThumbIndex] || mediaItems[0];
+                  if (!activeMedia) return <div style={{ height: '360px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>No Media</div>;
+
+                  return (
+                    <div>
+                      {activeMedia.type === 'video' ? (
+                        <video 
+                          src={activeMedia.url} 
+                          controls 
+                          style={{ width: '100%', height: '360px', objectFit: 'contain' }} 
+                        />
+                      ) : (
+                        <img 
+                          src={activeMedia.url} 
+                          alt={quickViewProduct.name} 
+                          style={{ width: '100%', height: '360px', objectFit: 'cover' }} 
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <img 
-                  src={quickViewProduct.image1} 
-                  alt="" 
-                  onClick={() => setQuickThumbIndex(0)}
-                  style={{
-                    width: '60px',
-                    height: '60px',
-                    objectFit: 'cover',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    border: quickThumbIndex === 0 ? '2px solid var(--gold)' : '1px solid var(--border-warm)'
-                  }}
-                />
-                <img 
-                  src={quickViewProduct.image2} 
-                  alt="" 
-                  onClick={() => setQuickThumbIndex(1)}
-                  style={{
-                    width: '60px',
-                    height: '60px',
-                    objectFit: 'cover',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    border: quickThumbIndex === 1 ? '2px solid var(--gold)' : '1px solid var(--border-warm)'
-                  }}
-                />
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {(() => {
+                  const mediaItems = [];
+                  if (quickViewProduct.image1) mediaItems.push({ type: 'image', url: quickViewProduct.image1 });
+                  if (quickViewProduct.image2) mediaItems.push({ type: 'image', url: quickViewProduct.image2 });
+                  if (quickViewProduct.image3) mediaItems.push({ type: 'image', url: quickViewProduct.image3 });
+                  if (quickViewProduct.image4) mediaItems.push({ type: 'image', url: quickViewProduct.image4 });
+                  if (quickViewProduct.image5) mediaItems.push({ type: 'image', url: quickViewProduct.image5 });
+                  if (quickViewProduct.image6) mediaItems.push({ type: 'image', url: quickViewProduct.image6 });
+                  if (quickViewProduct.image7) mediaItems.push({ type: 'image', url: quickViewProduct.image7 });
+                  if (quickViewProduct.image8) mediaItems.push({ type: 'image', url: quickViewProduct.image8 });
+                  if (quickViewProduct.video) mediaItems.push({ type: 'video', url: quickViewProduct.video });
+
+                  return mediaItems.map((item, idx) => (
+                    <div 
+                      key={idx}
+                      onClick={() => setQuickThumbIndex(idx)}
+                      style={{
+                        width: '60px',
+                        height: '60px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        border: (quickThumbIndex === idx || (quickThumbIndex >= mediaItems.length && idx === 0)) ? '2px solid var(--gold)' : '1px solid var(--border-warm)'
+                      }}
+                    >
+                      {item.type === 'video' ? (
+                        <div style={{ width: '100%', height: '100%', backgroundColor: 'var(--espresso)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontSize: '18px' }}>🎥</span>
+                        </div>
+                      ) : (
+                        <img 
+                          src={item.url} 
+                          alt="" 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      )}
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
 
@@ -3480,9 +3586,9 @@ export default function MothersCraft() {
                   Apply
                 </button>
               </form>
-              {appliedCoupon === "CRAFT10" && (
+              {appliedCoupon && (
                 <div style={{ fontSize: '12px', color: 'var(--sage)', fontWeight: '600', marginBottom: '12px' }}>
-                  ✓ CRAFT10 applied — ₹200 saved!
+                  ✓ {appliedCoupon} applied — ₹{discount} saved!
                 </div>
               )}
 
@@ -3498,10 +3604,10 @@ export default function MothersCraft() {
                     {shippingFee === 0 ? "FREE ✓" : `₹${shippingFee}`}
                   </span>
                 </div>
-                {appliedCoupon === "CRAFT10" && (
+                {appliedCoupon && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--sage)' }}>
                     <span>Discount</span>
-                    <span>−₹200</span>
+                    <span>−₹{discount}</span>
                   </div>
                 )}
                 
@@ -3521,7 +3627,13 @@ export default function MothersCraft() {
 
               {/* Checkout buttons */}
               <button 
-                onClick={() => addToast("Proceeding to dummy gateway...")}
+                onClick={() => {
+                  setCheckoutName("");
+                  setCheckoutEmail("");
+                  setCheckoutPhone("");
+                  setCheckoutAddress("");
+                  setCheckoutOpen(true);
+                }}
                 className="btn-base btn-primary"
                 style={{ width: '100%', height: '50px', fontSize: '16px' }}
               >
@@ -3559,15 +3671,249 @@ export default function MothersCraft() {
 
   // Helper shipping calculators
   const getShippingCost = (subtotal) => {
-    if (subtotal >= 499 || subtotal === 0) return 0;
-    return 49;
+    if (subtotal === 0) return 0;
+    const threshold = settings?.freeShippingThreshold ?? 499;
+    if (subtotal >= threshold) return 0;
+    return settings?.shippingZones?.[1]?.rate ?? 49;
   };
 
   const getPromoDiscount = () => {
-    if (appliedCoupon === "CRAFT10") {
-      return 200;
+    if (!appliedCoupon) return 0;
+    const coupon = coupons?.find(c => c.code.toUpperCase() === appliedCoupon.toUpperCase() && c.active);
+    if (!coupon) return 0;
+    const subtotal = getCartSubtotal();
+    if (coupon.type === 'percentage') {
+      return Math.round((subtotal * coupon.value) / 100);
+    } else {
+      return coupon.value;
     }
-    return 0;
+  };
+
+  // Checkout Modal Component
+  const renderCheckoutModal = () => {
+    if (!checkoutOpen) return null;
+
+    const subtotal = getCartSubtotal();
+    const shippingFee = getShippingCost(subtotal);
+    const discount = getPromoDiscount();
+    const gst = Math.round(subtotal * 0.18);
+    const total = subtotal + shippingFee - discount + gst;
+
+    const handlePlaceOrderSubmit = (e) => {
+      e.preventDefault();
+      if (!checkoutName || !checkoutEmail || !checkoutPhone || !checkoutAddress) {
+        addToast("Please fill in all details.");
+        return;
+      }
+      
+      const orderDetails = {
+        customer: {
+          name: checkoutName,
+          email: checkoutEmail,
+          phone: checkoutPhone,
+          address: checkoutAddress + (pincode ? `, PIN: ${pincode}` : '')
+        },
+        items: cartItems.map(item => ({
+          productId: item.product.id,
+          name: item.product.name,
+          variant: `${item.color} / ${item.size}`,
+          qty: item.quantity,
+          price: item.product.salePrice,
+          image: item.product.image1
+        })),
+        subtotal: subtotal,
+        shipping: shippingFee,
+        discount: discount,
+        tax: gst,
+        total: total,
+        payment: {
+          method: checkoutPaymentMethod,
+          status: checkoutPaymentMethod === 'COD' ? 'Pending' : 'Paid',
+          transactionId: checkoutPaymentMethod === 'COD' ? '' : 'UPI' + Math.round(Math.random() * 10000000000)
+        },
+        status: 'pending',
+        notes: ''
+      };
+
+      addOrder(orderDetails);
+      setCartItems([]);
+      setCheckoutOpen(false);
+      setCartOpen(false);
+      addToast("🎉 Order Placed Successfully! Real-time synced with Admin panel.");
+    };
+
+    return (
+      <div className="modal-backdrop" onClick={() => setCheckoutOpen(false)}>
+        <div 
+          className="artisan-card"
+          onClick={(e) => e.stopPropagation()}
+          style={{ 
+            maxWidth: '600px', 
+            width: '100%', 
+            maxHeight: '90vh', 
+            overflowY: 'auto', 
+            backgroundColor: 'var(--ivory)', 
+            padding: '30px',
+            position: 'relative'
+          }}
+        >
+          {/* Close button */}
+          <button 
+            onClick={() => setCheckoutOpen(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--mahogany)'
+            }}
+          >
+            <X size={24} />
+          </button>
+
+          <h2 style={{ 
+            fontFamily: "'Playfair Display', serif", 
+            fontSize: '28px', 
+            color: 'var(--mahogany)', 
+            marginBottom: '20px',
+            textAlign: 'center' 
+          }}>
+            Secure Checkout
+          </h2>
+
+          <form onSubmit={handlePlaceOrderSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-body)', display: 'block', marginBottom: '6px' }}>Full Name *</label>
+              <input 
+                type="text" 
+                required 
+                value={checkoutName} 
+                onChange={(e) => setCheckoutName(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-warm)', outline: 'none' }}
+                placeholder="Aarti Raghavan"
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-body)', display: 'block', marginBottom: '6px' }}>Email Address *</label>
+                <input 
+                  type="email" 
+                  required 
+                  value={checkoutEmail} 
+                  onChange={(e) => setCheckoutEmail(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-warm)', outline: 'none' }}
+                  placeholder="aarti.r@gmail.com"
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-body)', display: 'block', marginBottom: '6px' }}>Phone Number *</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={checkoutPhone} 
+                  onChange={(e) => setCheckoutPhone(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-warm)', outline: 'none' }}
+                  placeholder="+91 98765 43210"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-body)', display: 'block', marginBottom: '6px' }}>Shipping Address *</label>
+              <textarea 
+                required 
+                rows="3" 
+                value={checkoutAddress} 
+                onChange={(e) => setCheckoutAddress(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-warm)', outline: 'none', resize: 'none' }}
+                placeholder="42, MG Road, Indiranagar, Bangalore, Karnataka"
+              />
+              {pincode && (
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Pincode: <b>{pincode}</b> (Pre-loaded from delivery checker)
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-body)', display: 'block', marginBottom: '6px' }}>Payment Method *</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setCheckoutPaymentMethod("UPI")}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: `2px solid ${checkoutPaymentMethod === 'UPI' ? 'var(--terracotta)' : 'var(--border-warm)'}`,
+                    backgroundColor: checkoutPaymentMethod === 'UPI' ? 'rgba(192, 120, 80, 0.08)' : 'transparent',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    color: 'var(--mahogany)'
+                  }}
+                >
+                  📱 UPI / Net Banking
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setCheckoutPaymentMethod("COD")}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    border: `2px solid ${checkoutPaymentMethod === 'COD' ? 'var(--terracotta)' : 'var(--border-warm)'}`,
+                    backgroundColor: checkoutPaymentMethod === 'COD' ? 'rgba(192, 120, 80, 0.08)' : 'transparent',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    color: 'var(--mahogany)'
+                  }}
+                >
+                  💵 Cash on Delivery (COD)
+                </button>
+              </div>
+            </div>
+
+            {/* Order Summary */}
+            <div style={{ padding: '16px', background: 'var(--gold-light)', borderRadius: '10px', marginTop: '10px' }}>
+              <h4 style={{ fontFamily: "'Playfair Display', serif", fontSize: '16px', color: 'var(--mahogany)', marginBottom: '10px' }}>Order Summary</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Subtotal ({cartItems.reduce((sum, i) => sum + i.quantity, 0)} items)</span>
+                  <span>₹{subtotal}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Shipping</span>
+                  <span>{shippingFee === 0 ? "FREE" : `₹${shippingFee}`}</span>
+                </div>
+                {discount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--sage)' }}>
+                    <span>Discount</span>
+                    <span>−₹{discount}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>GST (18%)</span>
+                  <span>₹{gst}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '16px', borderTop: '1px solid var(--border-warm)', paddingTop: '6px', color: 'var(--mahogany)', marginTop: '4px' }}>
+                  <span>Grand Total</span>
+                  <span>₹{total}</span>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn-base btn-primary"
+              style={{ width: '100%', height: '50px', fontSize: '16px', marginTop: '10px' }}
+            >
+              Confirm & Place Order ₹{total}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
   };
 
   // Floating search Overlay Component
@@ -3711,7 +4057,7 @@ export default function MothersCraft() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <img 
-                  src="/logo.jpg" 
+                  src="/logo.jpg?v=3" 
                   alt="Mothers Craft Logo" 
                   style={{ height: '40px', width: '40px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--gold)' }} 
                 />
@@ -3723,11 +4069,11 @@ export default function MothersCraft() {
                   color: '#FFFFFF',
                   lineHeight: '1'
                 }}>
-                  Mothers Craft
+                  {settings?.storeName ?? 'Mothers Craft'}
                 </span>
               </div>
               <span style={{ fontSize: '11px', color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                Crafted with Love, Made for You
+                {settings?.tagline ?? 'Crafted with Love, Made for You'}
               </span>
               <p style={{ fontSize: '13px', color: 'rgba(245,230,204,0.7)', lineHeight: '1.6' }}>
                 Every stitch tells a story, and every craft brings warmth. Explore premium handmade goods.
@@ -3749,13 +4095,13 @@ export default function MothersCraft() {
                 <li><span onClick={() => addToast("Return portal...")} style={{ color: 'var(--gold-light)', cursor: 'pointer', textDecoration: 'none' }} className="footer-link">Request Return / Exchange</span></li>
                 <li><span onClick={() => addToast("Order tracking...")} style={{ color: 'var(--gold-light)', cursor: 'pointer', textDecoration: 'none' }} className="footer-link">Track Your Order</span></li>
                 <li style={{ marginTop: '8px' }}>
-                  <a href="tel:7983611108" style={{ color: 'var(--gold-light)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    📞 7983611108
+                  <a href={`tel:${settings?.contactPhone ?? '7983611108'}`} style={{ color: 'var(--gold-light)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    📞 {settings?.contactPhone ?? '7983611108'}
                   </a>
                 </li>
                 <li>
-                  <a href="mailto:motherscraft07@gmail.com" style={{ color: 'var(--gold-light)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    ✉️ motherscraft07@gmail.com
+                  <a href={`mailto:${settings?.contactEmail ?? 'motherscraft07@gmail.com'}`} style={{ color: 'var(--gold-light)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ✉️ {settings?.contactEmail ?? 'motherscraft07@gmail.com'}
                   </a>
                 </li>
               </ul>
@@ -4060,7 +4406,7 @@ export default function MothersCraft() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px', width: '100%', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <img 
-                  src="/logo.jpg" 
+                  src="/logo.jpg?v=3" 
                   alt="Mothers Craft Logo" 
                   style={{ height: '36px', width: '36px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--gold)' }} 
                 />
@@ -4135,23 +4481,23 @@ export default function MothersCraft() {
     return (
       <div className="mobile-only" style={{
         position: 'fixed',
-        top: 0,
         bottom: 0,
         left: 0,
-        width: '72px',
+        right: 0,
+        height: '60px',
         backgroundColor: '#FFFFFF',
-        borderRight: '1px solid var(--border-warm)',
+        borderTop: '1px solid var(--border-warm)',
         zIndex: 950,
         display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
+        flexDirection: 'row',
+        justifyContent: 'space-around',
         alignItems: 'center',
-        gap: '32px',
-        padding: '24px 0'
+        padding: '8px 0',
+        boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
       }}>
         <button 
           onClick={() => { setView({ page: 'home', productId: null }); setActiveCategoryFilter("All"); }}
-          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
+          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer' }}
         >
           <Compass size={20} style={{ color: view.page === 'home' && activeCategoryFilter === "All" ? 'var(--mahogany)' : 'var(--text-muted)' }} />
           <span style={{ fontSize: '10px', color: view.page === 'home' && activeCategoryFilter === "All" ? 'var(--mahogany)' : 'var(--text-muted)', fontWeight: '600' }}>Home</span>
@@ -4159,7 +4505,7 @@ export default function MothersCraft() {
 
         <button 
           onClick={() => { setView({ page: 'home', productId: null }); setActiveCategoryFilter("DIY Kits"); }}
-          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
+          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer' }}
         >
           <Award size={20} style={{ color: activeCategoryFilter === "DIY Kits" ? 'var(--mahogany)' : 'var(--text-muted)' }} />
           <span style={{ fontSize: '10px', color: activeCategoryFilter === "DIY Kits" ? 'var(--mahogany)' : 'var(--text-muted)', fontWeight: '600' }}>DIY Kits</span>
@@ -4167,7 +4513,7 @@ export default function MothersCraft() {
 
         <button 
           onClick={() => setSearchOpen(true)}
-          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
+          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer' }}
         >
           <Search size={20} style={{ color: 'var(--text-muted)' }} />
           <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Search</span>
@@ -4181,14 +4527,14 @@ export default function MothersCraft() {
               addToast(`Wishlist contains ${wishlistItems.length} items.`);
             }
           }}
-          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', position: 'relative' }}
+          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer', position: 'relative' }}
         >
           <Heart size={20} style={{ color: wishlistItems.length > 0 ? 'var(--rose)' : 'var(--text-muted)' }} />
           {wishlistItems.length > 0 && (
             <span style={{
               position: 'absolute',
               top: '-4px',
-              right: '-4px',
+              right: '12px',
               backgroundColor: 'var(--rose)',
               color: 'white',
               borderRadius: '50%',
@@ -4208,14 +4554,14 @@ export default function MothersCraft() {
 
         <button 
           onClick={() => setCartOpen(true)}
-          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', position: 'relative' }}
+          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer', position: 'relative' }}
         >
           <ShoppingBag size={20} style={{ color: cartItems.length > 0 ? 'var(--mahogany)' : 'var(--text-muted)' }} />
           {cartItems.length > 0 && (
             <span style={{
               position: 'absolute',
               top: '-4px',
-              right: '-4px',
+              right: '4px',
               backgroundColor: 'var(--mahogany)',
               color: 'var(--gold-light)',
               borderRadius: '50%',
@@ -4299,6 +4645,45 @@ export default function MothersCraft() {
   };
 
   const collectionProducts = getFilteredCollectionProducts();
+
+  if (settings?.maintenanceMode) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'var(--espresso)',
+        color: 'var(--gold-light)',
+        fontFamily: "'Playfair Display', serif",
+        textAlign: 'center',
+        padding: '24px'
+      }}>
+        {renderToasts()}
+        <div style={{
+          maxWidth: '500px',
+          padding: '40px',
+          borderRadius: '16px',
+          border: '1.5px solid var(--gold)',
+          backgroundColor: 'rgba(107, 58, 42, 0.2)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+        }}>
+          <h1 style={{ fontSize: '36px', color: 'var(--gold)', marginBottom: '16px' }}>
+            {settings.storeName || 'Mothers Craft'}
+          </h1>
+          <div style={{ width: '60px', height: '3px', background: 'var(--gold)', margin: '0 auto 24px' }}></div>
+          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '18px', color: '#FFFFFF', marginBottom: '20px', lineHeight: '1.6' }}>
+            {settings.maintenanceMessage || "We're updating our store. Please check back soon!"}
+          </p>
+          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: 'var(--terracotta)', letterSpacing: '0.05em' }}>
+            Traditional Craftsmanship · Modern Warmth
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--ivory)', position: 'relative' }}>
@@ -4412,15 +4797,47 @@ export default function MothersCraft() {
       {/* Search overlay panel */}
       {renderSearchOverlay()}
 
-      {/* Layout mobile fixes padding left to clear fixed left side nav bar */}
+      {/* Checkout overlay modal */}
+      {renderCheckoutModal()}
+
+      {/* Layout mobile fixes padding bottom to clear fixed bottom side nav bar and responsive grid overrides */}
       <style>{`
         @media (max-width: 768px) {
           body {
-            padding-left: 72px !important;
-            padding-bottom: 0 !important;
+            padding-left: 0 !important;
+            padding-bottom: 60px !important;
           }
           .cookie-bar {
-            left: 72px !important;
+            left: 0 !important;
+            bottom: 60px !important;
+          }
+          .trust-strip-container {
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+            gap: 12px 24px !important;
+          }
+          .trust-strip-divider {
+            display: none !important;
+          }
+          .insta-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .logo-title {
+            font-size: 18px !important;
+          }
+          .logo-tagline {
+            display: none !important;
+          }
+          .insta-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .newsletter-form {
+            flex-direction: column !important;
+          }
+          .newsletter-form button {
+            width: 100% !important;
           }
         }
       `}</style>
