@@ -1115,37 +1115,61 @@ export default function AdminPanel() {
     const [editingCatName, setEditingCatName] = useState('');
 
     const handleAddCategory = () => {
-      if (!newCategoryName.trim()) return;
-      store.addCategory({ name: newCategoryName.trim(), subcategories: [] });
-      setNewCategoryName('');
-      showToast('Category added successfully!');
+      try {
+        if (!newCategoryName.trim()) return;
+        if (typeof store.addCategory !== 'function') {
+          showToast('addCategory is not available on store', 'error');
+          return;
+        }
+        store.addCategory({ name: newCategoryName.trim(), subcategories: [] });
+        setNewCategoryName('');
+        showToast('Category added successfully!');
+      } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
+      }
     };
 
     const handleAddSubcategory = (catId) => {
-      if (!newSubcategoryName.trim()) return;
-      const cat = store.categories.find(c => c.id === catId);
-      if (cat) {
-        const updatedSubs = [...cat.subcategories, newSubcategoryName.trim()];
-        store.updateCategory(catId, { subcategories: updatedSubs });
-        setNewSubcategoryName('');
-        showToast('Subcategory added!');
+      try {
+        if (!newSubcategoryName.trim()) return;
+        const cat = store.categories.find(c => c.id === catId);
+        if (cat) {
+          const updatedSubs = [...cat.subcategories, newSubcategoryName.trim()];
+          store.updateCategory(catId, { subcategories: updatedSubs });
+          setNewSubcategoryName('');
+          showToast('Subcategory added!');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
       }
     };
 
     const handleDeleteSubcategory = (catId, subName) => {
-      const cat = store.categories.find(c => c.id === catId);
-      if (cat) {
-        const updatedSubs = cat.subcategories.filter(s => s !== subName);
-        store.updateCategory(catId, { subcategories: updatedSubs });
-        showToast('Subcategory removed');
+      try {
+        const cat = store.categories.find(c => c.id === catId);
+        if (cat) {
+          const updatedSubs = cat.subcategories.filter(s => s !== subName);
+          store.updateCategory(catId, { subcategories: updatedSubs });
+          showToast('Subcategory removed');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
       }
     };
 
     const handleSaveCategoryEdit = (catId) => {
-      if (!editingCatName.trim()) return;
-      store.updateCategory(catId, { name: editingCatName.trim() });
-      setEditingCatId(null);
-      showToast('Category renamed');
+      try {
+        if (!editingCatName.trim()) return;
+        store.updateCategory(catId, { name: editingCatName.trim() });
+        setEditingCatId(null);
+        showToast('Category renamed');
+      } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
+      }
     };
 
     return (
