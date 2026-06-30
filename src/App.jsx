@@ -3849,6 +3849,19 @@ export default function MothersCraft() {
                 <button type="submit" className="ua-btn ua-btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}>
                   Sign In
                 </button>
+                <div style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'var(--ua-text-secondary)' }}>
+                  Are you an Admin?{' '}
+                  <button 
+                    type="button"
+                    onClick={() => { 
+                      setAuthModalOpen(false); 
+                      setActiveTab('admin'); 
+                    }}
+                    style={{ background: 'none', border: 'none', color: 'var(--terracotta)', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                  >
+                    Go to Admin Login
+                  </button>
+                </div>
               </form>
             ) : (
               <form onSubmit={handleRegisterSubmit}>
