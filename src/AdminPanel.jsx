@@ -1107,7 +1107,7 @@ export default function AdminPanel() {
   // CATALOGUE / CATEGORY MANAGEMENT
   // ════════════════════════════════════════════════════════════════
 
-  const renderCatalogue = () => {
+  const Catalogue = ({ setConfirmModal, showToast }) => {
     const [newCategoryName, setNewCategoryName] = useState('');
     const [newSubcategoryName, setNewSubcategoryName] = useState('');
     const [selectedCategoryId, setSelectedCategoryId] = useState(null);
@@ -2154,7 +2154,7 @@ export default function AdminPanel() {
     switch (adminPage) {
       case 'dashboard': return renderDashboard();
       case 'products': return renderProducts();
-      case 'catalogue': return renderCatalogue();
+      case 'catalogue': return <Catalogue setConfirmModal={setConfirmModal} showToast={showToast} />;
       case 'orders': return renderOrders();
       case 'customers': return renderCustomers();
       case 'discounts': return renderDiscounts();
