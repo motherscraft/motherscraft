@@ -1149,25 +1149,119 @@ export default function AdminPanel() {
     };
 
     return (
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>Products</h1>
+      <div style={{ fontFamily: "'Inter', sans-serif", color: '#1E1209' }}>
+        
+        {/* Header Breadcrumbs and Add Button */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)', display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
+              <span>My Listings</span>
+              <span>&gt;</span>
+              <span style={{ color: 'var(--admin-text)' }}>Listing Creation</span>
+            </div>
+            <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '24px', fontWeight: '700', color: 'var(--admin-text)', margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
+              Listing Creation
+              <span style={{ display: 'inline-flex', gap: '6px', fontSize: '11px', fontWeight: 'normal', fontFamily: "'Inter', sans-serif" }}>
+                <span style={{ padding: '2px 8px', borderRadius: '12px', border: '1px solid #007aff', color: '#007aff', background: 'rgba(0,122,255,0.05)', fontWeight: 'bold' }}>✦ Flipkart</span>
+                <span style={{ padding: '2px 8px', borderRadius: '12px', border: '1px solid #ff9500', color: '#ff9500', background: 'rgba(255,149,0,0.05)', fontWeight: 'bold' }}>✦ Shopsy</span>
+              </span>
+            </h1>
+          </div>
           {(currentAdmin.role !== 'support') && (
-            <button className="admin-btn admin-btn-gold" onClick={() => { setEditingProduct('new'); setProductForm({ status: currentAdmin.role === 'staff' ? 'pending' : 'published', lowStockThreshold: 10, tags: [], sizes: [], colorNames: [], colors: [] }); setProductFormTab('basic'); }}><Plus size={16} /> Add Product</button>
+            <button 
+              className="admin-btn admin-btn-primary" 
+              style={{ background: '#007aff', borderColor: '#007aff', color: '#fff', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '6px' }}
+              onClick={() => { setEditingProduct('new'); setProductForm({ status: currentAdmin.role === 'staff' ? 'pending' : 'published', lowStockThreshold: 10, tags: [], sizes: [], colorNames: [], colors: [] }); setProductFormTab('basic'); }}
+            >
+              Add New Listing <span style={{ fontSize: '10px' }}>▼</span>
+            </button>
           )}
+        </div>
+
+        {/* Festive Banner Carousel */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+          borderRadius: '12px',
+          padding: '24px 32px',
+          color: '#FFFFFF',
+          position: 'relative',
+          overflow: 'hidden',
+          marginBottom: '28px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.08)'
+        }}>
+          {/* Decorative lights */}
+          <div style={{ position: 'absolute', top: 0, left: '20%', fontSize: '16px', opacity: 0.2 }}>🏮 🏮 🏮 🏮</div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 2 }}>
+            <div style={{ background: '#e11d48', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', textAlign: 'center', color: '#fff' }}>
+              FESTIVAL<br />DEALS
+            </div>
+            <div>
+              <h3 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 6px 0', color: '#38bdf8' }}>
+                This Year's Biggest Festive Sale is Here!
+              </h3>
+              <p style={{ fontSize: '13px', margin: 0, color: 'rgba(255, 255, 255, 0.8)' }}>
+                List now & see your storefront sales spike up to 5x* during the golden season.
+              </p>
+            </div>
+          </div>
+          <div style={{ zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#fbbf24' }}>Hurry, don't miss out!</span>
+            <button 
+              className="admin-btn"
+              style={{ background: '#ffffff', color: '#0f172a', fontWeight: '700', border: 'none', padding: '8px 16px', borderRadius: '6px' }}
+              onClick={() => { setEditingProduct('new'); setProductForm({ status: currentAdmin.role === 'staff' ? 'pending' : 'published', lowStockThreshold: 10, tags: [], sizes: [], colorNames: [], colors: [] }); setProductFormTab('basic'); }}
+            >
+              List Now
+            </button>
+          </div>
+        </div>
+
+        {/* Progress Tabs */}
+        <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--admin-border)', marginBottom: '20px', flexWrap: 'wrap' }}>
+          {[
+            { id: 'single', label: 'Single Listings', active: true },
+            { id: 'bulk', label: 'Bulk Listings', active: false },
+            { id: 'variants', label: 'Bulk Variant Groupings', active: false },
+            { id: 'videos', label: 'Listing Videos', badge: 'New', active: false },
+          ].map(tab => (
+            <button 
+              key={tab.id}
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                borderBottom: tab.active ? '3px solid #007aff' : '3px solid transparent', 
+                padding: '10px 4px 12px 4px', 
+                fontSize: '13px', 
+                fontWeight: '700', 
+                color: tab.active ? '#007aff' : 'var(--admin-text-secondary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                position: 'relative'
+              }}
+            >
+              {tab.label}
+              {tab.badge && <span style={{ fontSize: '9px', background: '#e11d48', color: '#fff', padding: '1px 4px', borderRadius: '4px', lineHeight: 1 }}>{tab.badge}</span>}
+            </button>
+          ))}
         </div>
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: '1 1 250px', maxWidth: 320 }}>
             <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)' }} />
-            <input className="admin-input" style={{ paddingLeft: 32 }} placeholder="Search products..." value={productSearch} onChange={e => { setProductSearch(e.target.value); setProductPage(1); }} />
+            <input className="admin-input" style={{ paddingLeft: 32 }} placeholder="Search SKU ID, listing name..." value={productSearch} onChange={e => { setProductSearch(e.target.value); setProductPage(1); }} />
           </div>
           <select className="admin-select" style={{ width: 'auto', minWidth: 160 }} value={productFilter} onChange={e => { setProductFilter(e.target.value); setProductPage(1); }}>
-            <option value="all">All Products ({products.length})</option>
-            <option value="published">Published ({products.filter(p => p.status === 'published').length})</option>
-            <option value="draft">Draft ({products.filter(p => p.status === 'draft').length})</option>
-            <option value="pending">Pending ({products.filter(p => p.status === 'pending').length})</option>
+            <option value="all">All Listings ({products.length})</option>
+            <option value="published">QC Passed / Published ({products.filter(p => p.status === 'published').length})</option>
+            <option value="draft">Draft Listings ({products.filter(p => p.status === 'draft').length})</option>
+            <option value="pending">QC In Progress / Pending ({products.filter(p => p.status === 'pending').length})</option>
             <option value="low_stock">Low Stock ({products.filter(p => p.stock > 0 && p.stock <= p.lowStockThreshold).length})</option>
             <option value="out_of_stock">Out of Stock ({products.filter(p => p.stock === 0).length})</option>
           </select>
@@ -1186,7 +1280,7 @@ export default function AdminPanel() {
           )}
         </div>
 
-        {/* Products Table */}
+        {/* Listings Table */}
         <div className="admin-card">
           <div style={{ overflowX: 'auto' }}>
             <table className="admin-table">
@@ -1201,47 +1295,121 @@ export default function AdminPanel() {
                     />
                   </th>
                   <th style={{ width: 50 }}></th>
-                  <th>Product</th>
-                  <th>SKU</th>
-                  <th>Category</th>
-                  <th>Price</th>
-                  <th>Stock</th>
+                  <th>Product Detail</th>
                   <th>Status</th>
-                  <th>Actions</th>
+                  <th>Created On</th>
+                  <th>Updated On</th>
+                  <th>Listing Improvement</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {paged.length === 0 && <tr><td colSpan={9}><div className="admin-empty-state">No products found</div></td></tr>}
-                {paged.map(p => (
-                  <tr key={p.id} style={{ background: selectedProducts.includes(p.id) ? 'rgba(192,120,80,0.04)' : 'none' }}>
-                    <td style={{ textAlign: 'center' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={selectedProducts.includes(p.id)} 
-                        onChange={e => handleSelectOne(p.id, e.target.checked)} 
-                        style={{ cursor: 'pointer' }}
-                      />
-                    </td>
-                    <td><img src={p.image1} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--admin-border)' }} /></td>
-                    <td><div style={{ fontWeight: 600, fontSize: 13 }}>{truncate(p.name, 32)}</div>{p.featured && <span style={{ fontSize: 10, color: '#D4A96A' }}>★ Featured</span>}</td>
-                    <td style={{ fontSize: 12, color: 'var(--admin-text-muted)', fontFamily: 'monospace' }}>{p.sku || '—'}</td>
-                    <td style={{ fontSize: 12 }}>{p.category}</td>
-                    <td><div style={{ fontWeight: 600 }}>{formatCurrency(p.salePrice)}</div><div style={{ fontSize: 11, color: 'var(--admin-text-muted)', textDecoration: 'line-through' }}>{formatCurrency(p.originalPrice)}</div></td>
-                    <td><span style={{ fontWeight: 600, color: p.stock === 0 ? '#DC3545' : p.stock <= (p.lowStockThreshold || 10) ? '#D4A96A' : '#7A9E7E' }}>{p.stock}</span></td>
-                    <td><span className={`admin-pill ${statusColor(p.status)}`}>{p.status.charAt(0).toUpperCase() + p.status.slice(1)}</span></td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        {p.status === 'pending' && (currentAdmin.role === 'super_admin' || currentAdmin.role === 'manager') && (
-                          <button className="admin-btn-icon" title="Approve" onClick={() => { store.approveProduct(p.id); showToast('Product approved!'); }}><Check size={15} color="#7A9E7E" /></button>
+                {paged.length === 0 && <tr><td colSpan={8}><div className="admin-empty-state">No listings found</div></td></tr>}
+                {paged.map(p => {
+                  const isDraft = p.status === 'draft';
+                  const isPending = p.status === 'pending';
+                  const isQC = p.status === 'published';
+                  return (
+                    <tr key={p.id} style={{ background: selectedProducts.includes(p.id) ? 'rgba(0,122,255,0.03)' : 'none' }}>
+                      <td style={{ textAlign: 'center' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedProducts.includes(p.id)} 
+                          onChange={e => handleSelectOne(p.id, e.target.checked)} 
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
+                      <td>
+                        <img src={p.image1} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--admin-border)' }} />
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--espresso)' }}>{truncate(p.name, 36)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', fontFamily: 'monospace', marginTop: '2px' }}>SKU ID: {p.sku || `MC-${p.id}`}</div>
+                      </td>
+                      <td>
+                        {isQC ? (
+                          <span style={{ 
+                            padding: '3px 8px', 
+                            borderRadius: '4px', 
+                            border: '1.5px solid #198754', 
+                            color: '#198754', 
+                            background: 'rgba(25,135,84,0.05)', 
+                            fontSize: '11px', 
+                            fontWeight: '700',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            🖥 QC Passed
+                          </span>
+                        ) : isPending ? (
+                          <span style={{ 
+                            padding: '3px 8px', 
+                            borderRadius: '4px', 
+                            border: '1.5px solid #ff9500', 
+                            color: '#ff9500', 
+                            background: 'rgba(255,149,0,0.05)', 
+                            fontSize: '11px', 
+                            fontWeight: '700'
+                          }}>
+                            QC In Progress
+                          </span>
+                        ) : (
+                          <span style={{ 
+                            padding: '3px 8px', 
+                            borderRadius: '4px', 
+                            border: '1.5px solid #6c757d', 
+                            color: '#6c757d', 
+                            background: 'rgba(108,117,125,0.05)', 
+                            fontSize: '11px', 
+                            fontWeight: '700'
+                          }}>
+                            Draft
+                          </span>
                         )}
-                        <button className="admin-btn-icon" title="Edit" onClick={() => { setEditingProduct(p.id); setProductForm({ ...p }); setProductFormTab('basic'); }}><Edit3 size={15} /></button>
-                        {(currentAdmin.role === 'super_admin' || currentAdmin.role === 'manager') && (
-                          <button className="admin-btn-icon" title="Delete" onClick={() => setConfirmModal({ title: 'Delete Product', message: `Delete "${p.name}"? This cannot be undone.`, danger: true, onConfirm: () => { store.deleteProduct(p.id); setConfirmModal(null); showToast('Product deleted'); } })}><Trash2 size={15} color="#DC3545" /></button>
+                      </td>
+                      <td style={{ fontSize: 12, color: 'var(--admin-text-secondary)' }}>Jun 22, 2026</td>
+                      <td style={{ fontSize: 12, color: 'var(--admin-text-secondary)' }}>Jun 22, 2026</td>
+                      <td style={{ fontSize: 12 }}>
+                        {isDraft ? (
+                          <span style={{ color: 'var(--admin-text-secondary)' }}>Complete it & send for QC</span>
+                        ) : (
+                          <span style={{ color: '#198754', fontWeight: '500' }}>
+                            ⚡ Only {p.discount ? '95.00%' : '90.00%'} filled. Add details to boost visibility
+                          </span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <button 
+                            className="admin-btn admin-btn-sm" 
+                            style={{ 
+                              background: 'none', 
+                              border: 'none', 
+                              color: '#007aff', 
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              padding: 0
+                            }}
+                            onClick={() => { setEditingProduct(p.id); setProductForm({ ...p }); setProductFormTab('basic'); }}
+                          >
+                            {isDraft ? 'Continue' : 'View details'}
+                          </button>
+                          {(currentAdmin.role === 'super_admin' || currentAdmin.role === 'manager') && (
+                            <button 
+                              className="admin-btn-icon" 
+                              title="Delete" 
+                              onClick={() => setConfirmModal({ title: 'Delete Product', message: `Delete "${p.name}"? This cannot be undone.`, danger: true, onConfirm: () => { store.deleteProduct(p.id); setConfirmModal(null); showToast('Product deleted'); } })}
+                              style={{ padding: 2 }}
+                            >
+                              <Trash2 size={14} color="#DC3545" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
