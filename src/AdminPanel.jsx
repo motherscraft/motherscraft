@@ -397,7 +397,13 @@ export default function AdminPanel() {
   // DASHBOARD PAGE
   // ════════════════════════════════════════════════════════════════
 
-  const renderDashboard = () => {
+  const Dashboard = ({ nav, setProductSearch, setSelectedOrder, setEditingProduct, setConfirmModal, showToast }) => {
+    const store = useStore();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [whatsNewIndex, setWhatsNewIndex] = useState(0);
+
+    const { products, orders, customers, reviews } = store;
+
     const totalRevenue = orders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0);
     const totalOrders = orders.length;
     const totalCustomers = customers.length;
@@ -405,150 +411,292 @@ export default function AdminPanel() {
     const pendingOrders = orders.filter(o => o.status === 'pending').length;
     const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= p.lowStockThreshold && p.status === 'published');
     const outOfStockProducts = products.filter(p => p.stock === 0 && p.status === 'published');
-    const recentOrders = [...orders].sort((a, b) => b.id - a.id).slice(0, 8);
+    const recentOrders = [...orders].sort((a, b) => b.id - a.id).slice(0, 5);
     const pendingReviews = reviews.filter(r => r.status === 'pending');
+    
+    const handleSearchSubmit = (e) => {
+      e.preventDefault();
+      if (!searchQuery.trim()) return;
+      
+      const foundProduct = products.find(p => p.sku?.toLowerCase() === searchQuery.toLowerCase() || p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      if (foundProduct) {
+        nav('products');
+        setProductSearch(foundProduct.name);
+        return;
+      }
+      
+      const foundOrder = orders.find(o => o.id.toString() === searchQuery.trim() || o.customer.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      if (foundOrder) {
+        nav('orders');
+        setSelectedOrder(foundOrder);
+        return;
+      }
+      showToast('No matching SKU, Order ID or Customer found', 'error');
+    };
 
-    // Sales by month simulation
-    const salesData = [4200, 5800, 7100, 6400, 8200, 9500, 11200, 10800, 12400, 11900, 13200, totalRevenue > 0 ? totalRevenue / 2 : 7800];
-    const salesLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const whatsNewSlides = [
+      { title: "Monitor competition hassle-free!", subtitle: "Compare prices and metrics with top selling craft supplies.", buttonText: "Track Now" },
+      { title: "Boost sales by 25% with DIY Kits!", subtitle: "Demand for DIY kits has increased this week. Add new variations now.", buttonText: "Add Kits" },
+      { title: "Create custom coupon codes!", subtitle: "Offer flat discounts or percentage off coupons for the upcoming festival sale.", buttonText: "Manage Coupons" }
+    ];
 
-    // Category distribution
-    const catData = {};
-    products.filter(p => p.status === 'published').forEach(p => { catData[p.category] = (catData[p.category] || 0) + 1; });
-    const catColors = ['#6B3A2A', '#C07850', '#D4A96A', '#7A9E7E', '#C48B9F'];
-    const donutData = Object.entries(catData).map(([label, value], i) => ({ label, value, color: catColors[i % catColors.length] }));
-
-    // Top sellers
-    const topSellers = [...products].filter(p => p.status === 'published').sort((a, b) => b.reviewsCount - a.reviewsCount).slice(0, 5).map(p => ({ label: p.name, value: p.salePrice * p.reviewsCount, color: '#D4A96A' }));
+    const currentSlide = whatsNewSlides[whatsNewIndex];
 
     return (
-      <div>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>Dashboard</h1>
-          <p style={{ fontSize: 13, color: 'var(--admin-text-muted)', marginTop: 4 }}>Welcome back, {currentAdmin.name}. Here's what's happening today.</p>
+      <div style={{ fontFamily: "'Inter', sans-serif", color: '#1E1209' }}>
+        
+        {/* Top Search Bar */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28, marginTop: 12 }}>
+          <form onSubmit={handleSearchSubmit} style={{ position: 'relative', width: '100%', maxWidth: '640px' }}>
+            <Search size={18} style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)', color: 'rgba(107, 58, 42, 0.6)' }} />
+            <input 
+              className="admin-input" 
+              style={{ 
+                padding: '14px 20px 14px 48px', 
+                borderRadius: '30px', 
+                border: '1.5px solid rgba(192, 120, 80, 0.25)', 
+                fontSize: '14px', 
+                boxShadow: '0 4px 16px rgba(107, 58, 42, 0.05)',
+                width: '100%',
+                outline: 'none',
+                background: '#FFFFFF'
+              }} 
+              placeholder="Search SKU, Order ID, Pincode or Customer name..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </form>
         </div>
 
-        {/* Stat Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+        {/* Flipkart Style Horizontal KPI cards */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+          gap: '12px', 
+          marginBottom: '28px',
+          background: '#FFFFFF',
+          padding: '16px',
+          borderRadius: '12px',
+          border: '1px solid var(--admin-border)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+        }}>
           {[
-            { label: 'Total Revenue', value: formatCurrency(totalRevenue), icon: IndianRupee, color: '#D4A96A', spark: [42, 58, 71, 64, 82, 95, 112], trend: '+18.2%', trendUp: true },
-            { label: 'Total Orders', value: totalOrders, icon: ShoppingCart, color: '#C07850', spark: [8, 12, 15, 11, 18, 22, 25], trend: '+12.5%', trendUp: true },
-            { label: 'Customers', value: totalCustomers, icon: Users, color: '#7A9E7E', spark: [3, 5, 6, 7, 8, 9, 10], trend: '+8.1%', trendUp: true },
-            { label: 'Active Products', value: totalProducts, icon: Package, color: '#C48B9F', spark: [15, 16, 17, 18, 19, 20, totalProducts], trend: `${pendingOrders} pending`, trendUp: false },
-          ].map((s, i) => (
-            <div key={i} className="admin-stat-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>{s.label}</p>
-                  <h2 style={{ fontSize: 26, fontWeight: 700, color: 'var(--admin-text)', margin: '6px 0 0' }}>{s.value}</h2>
-                </div>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: `${s.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <s.icon size={20} color={s.color} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-                <Sparkline data={s.spark} color={s.color} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: s.trendUp ? '#7A9E7E' : 'var(--admin-text-muted)', display: 'flex', alignItems: 'center', gap: 2 }}>
-                  {s.trendUp && <TrendingUp size={12} />} {s.trend}
-                </span>
-              </div>
+            { label: 'Impressions', value: '46.7K', sub: '28 Jun: 42.5K', color: '#6B3A2A' },
+            { label: "Today's Units", value: '129', sub: 'Yesterday\'s total: 181', color: '#C07850' },
+            { label: "Today's Sales", value: '₹48.7K', sub: 'Yesterday\'s total: ₹67.6K', color: '#D4A96A' },
+            { label: 'New Orders', value: pendingOrders, sub: `Pending RTD: ${pendingOrders}`, color: '#7A9E7E' },
+            { label: 'Pending Reviews', value: pendingReviews.length, sub: 'Awaiting check', color: '#C48B9F' },
+            { label: 'Upcoming Payout', value: formatCurrency(totalRevenue * 0.85), sub: 'Due Tomorrow', color: '#E0A899' },
+          ].map((kpi, idx) => (
+            <div key={idx} style={{ 
+              padding: '12px', 
+              borderRight: idx < 5 ? '1px solid var(--admin-border)' : 'none',
+              textAlign: 'left'
+            }} className="kpi-block-mobile">
+              <span style={{ fontSize: '11px', color: 'var(--admin-text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{kpi.label}</span>
+              <h2 style={{ fontSize: '24px', fontWeight: '700', color: kpi.color, margin: '4px 0' }}>{kpi.value}</h2>
+              <span style={{ fontSize: '10px', color: 'var(--admin-text-muted)', display: 'block' }}>{kpi.sub}</span>
             </div>
           ))}
         </div>
 
-        {/* Charts Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16, marginBottom: 24 }}>
-          {/* Sales Overview */}
-          <div className="admin-card">
-            <div className="admin-card-header">
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>Sales Overview</h3>
-              <span style={{ fontSize: 11, color: 'var(--admin-text-muted)' }}>Last 12 months</span>
+        {/* Dashboard Grid Section */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '28px' }}>
+          
+          {/* Whats New Announcements Slider */}
+          <div className="admin-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '240px' }}>
+            <div className="admin-card-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--admin-text)', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                📢 What's New
+              </h3>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button 
+                  className="admin-btn-icon" 
+                  onClick={() => setWhatsNewIndex(prev => (prev > 0 ? prev - 1 : whatsNewSlides.length - 1))}
+                  style={{ width: 24, height: 24, fontSize: 10 }}
+                >
+                  ◀
+                </button>
+                <button 
+                  className="admin-btn-icon" 
+                  onClick={() => setWhatsNewIndex(prev => (prev < whatsNewSlides.length - 1 ? prev + 1 : 0))}
+                  style={{ width: 24, height: 24, fontSize: 10 }}
+                >
+                  ▶
+                </button>
+              </div>
             </div>
-            <div className="admin-card-body"><LineChart data={salesData} labels={salesLabels} /></div>
+            <div className="admin-card-body" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 12 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '700', margin: 0, color: 'var(--espresso)' }}>{currentSlide.title}</h4>
+              <p style={{ fontSize: '12px', color: 'var(--admin-text-secondary)', margin: 0, lineHeight: '1.5' }}>{currentSlide.subtitle}</p>
+            </div>
+            <div style={{ padding: '0 20px 20px' }}>
+              <button 
+                className="admin-btn admin-btn-secondary" 
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => {
+                  if (whatsNewIndex === 0) nav('products');
+                  if (whatsNewIndex === 1) { nav('products'); setEditingProduct('new'); }
+                  if (whatsNewIndex === 2) nav('discounts');
+                }}
+              >
+                {currentSlide.buttonText}
+              </button>
+            </div>
           </div>
 
-          {/* Category Distribution */}
-          <div className="admin-card">
+          {/* Settlement Hub */}
+          <div className="admin-card" style={{ minHeight: '240px' }}>
             <div className="admin-card-header">
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>Products by Category</h3>
+              <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--admin-text)', margin: 0 }}>📊 Settlement Hub</h3>
+              <span style={{ fontSize: '11px', color: 'var(--admin-text-muted)' }}>Estimated earnings</span>
             </div>
-            <div className="admin-card-body" style={{ display: 'flex', justifyContent: 'center' }}>
-              <DonutChart data={donutData} />
+            <div className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--admin-border)', paddingBottom: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--admin-text-secondary)' }}>Total Sales Revenue:</span>
+                <strong style={{ fontSize: '13px' }}>{formatCurrency(totalRevenue)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--admin-border)', paddingBottom: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--admin-text-secondary)' }}>Commission & GST:</span>
+                <strong style={{ fontSize: '13px', color: 'var(--admin-danger)' }}>-{formatCurrency(totalRevenue * 0.18)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '4px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '700' }}>Estimated Net Profit:</span>
+                <strong style={{ fontSize: '14px', color: '#7A9E7E' }}>{formatCurrency(totalRevenue * 0.82)}</strong>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <button className="admin-btn admin-btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => nav('analytics')}>
+                  Go to Settlement Planner
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Feedback & Complaints */}
+          <div className="admin-card" style={{ minHeight: '240px' }}>
+            <div className="admin-card-header">
+              <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--admin-text)', margin: 0 }}>💬 Customer Feedback Insights</h3>
+            </div>
+            <div className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 8, padding: '10px', background: 'rgba(220,53,69,0.03)', border: '1px solid rgba(220,53,69,0.08)', borderRadius: 8 }}>
+                <AlertCircle size={16} color="#DC3545" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: '11px', color: 'var(--admin-text-secondary)', lineHeight: '1.4' }}>
+                  <strong>Listings received complaints:</strong> Quality not as expected, items missing packaging accessories.
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, padding: '10px', background: 'rgba(122,158,126,0.04)', border: '1px solid rgba(122,158,126,0.1)', borderRadius: 8 }}>
+                <Check size={16} color="#7A9E7E" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: '11px', color: 'var(--admin-text-secondary)', lineHeight: '1.4' }}>
+                  <strong>Recent 5-Star Rating:</strong> Beautifully handmade Macramé hangings liked by Jaipur customers.
+                </div>
+              </div>
+              <button 
+                className="admin-btn admin-btn-secondary" 
+                style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}
+                onClick={() => nav('reviews')}
+              >
+                View Recommendations & Reviews ({reviews.length})
+              </button>
+            </div>
+          </div>
+
         </div>
 
-        {/* Top Sellers + Alerts */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16, marginBottom: 24 }}>
-          {/* Top Sellers */}
+        {/* Low Stock Alerts & Recent Orders Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '28px' }}>
+          
+          {/* Inventory status alerts */}
           <div className="admin-card">
             <div className="admin-card-header">
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>Top 5 Bestsellers</h3>
-            </div>
-            <div className="admin-card-body"><HBarChart data={topSellers} /></div>
-          </div>
-
-          {/* Alerts */}
-          <div className="admin-card">
-            <div className="admin-card-header">
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>Alerts & Notifications</h3>
+              <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--admin-text)', margin: 0 }}>📦 Inventory & Stock Status</h3>
             </div>
             <div className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {lowStockProducts.length > 0 && lowStockProducts.map(p => (
+              {lowStockProducts.length > 0 && lowStockProducts.slice(0, 3).map(p => (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(212,169,106,0.06)', border: '1px solid rgba(212,169,106,0.15)' }}>
                   <AlertTriangle size={14} color="#D4A96A" />
                   <span style={{ fontSize: 12, flex: 1, color: 'var(--admin-text-secondary)' }}>{truncate(p.name, 28)} — only <b>{p.stock}</b> left</span>
                   <span className="admin-pill admin-pill-warning">Low Stock</span>
                 </div>
               ))}
-              {outOfStockProducts.map(p => (
+              {outOfStockProducts.slice(0, 3).map(p => (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(220,53,69,0.04)', border: '1px solid rgba(220,53,69,0.12)' }}>
                   <AlertCircle size={14} color="#DC3545" />
                   <span style={{ fontSize: 12, flex: 1, color: 'var(--admin-text-secondary)' }}>{truncate(p.name, 28)} — <b>Out of Stock!</b></span>
                   <span className="admin-pill admin-pill-danger">OOS</span>
                 </div>
               ))}
-              {pendingReviews.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(196,139,159,0.06)', border: '1px solid rgba(196,139,159,0.15)' }}>
-                  <MessageSquare size={14} color="#C48B9F" />
-                  <span style={{ fontSize: 12, flex: 1, color: 'var(--admin-text-secondary)' }}>{pendingReviews.length} review(s) awaiting moderation</span>
-                  <button className="admin-btn admin-btn-sm admin-btn-secondary" onClick={() => nav('reviews')}>Review</button>
-                </div>
-              )}
-              {lowStockProducts.length === 0 && outOfStockProducts.length === 0 && pendingReviews.length === 0 && (
+              {lowStockProducts.length === 0 && outOfStockProducts.length === 0 && (
                 <div className="admin-empty-state" style={{ padding: 24 }}>
                   <Check size={24} color="#7A9E7E" />
-                  <p style={{ marginTop: 8, fontSize: 13 }}>All clear! No alerts right now.</p>
+                  <p style={{ marginTop: 8, fontSize: 13 }}>All inventory levels are optimal.</p>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Recent Orders */}
+          <div className="admin-card">
+            <div className="admin-card-header">
+              <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--admin-text)', margin: 0 }}>Recent Orders</h3>
+              <button className="admin-btn admin-btn-sm admin-btn-secondary" onClick={() => nav('orders')}>View All</button>
+            </div>
+            <div className="admin-card-body" style={{ padding: 0, overflowX: 'auto' }}>
+              <table className="admin-table">
+                <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+                <tbody>
+                  {recentOrders.map(o => (
+                    <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => { nav('orders'); setTimeout(() => setSelectedOrder(o), 50); }}>
+                      <td style={{ fontWeight: 600 }}>#{o.id}</td>
+                      <td>{o.customer.name.split(' ')[0]}</td>
+                      <td>{o.items.length} item(s)</td>
+                      <td style={{ fontWeight: 600 }}>{formatCurrency(o.total)}</td>
+                      <td><span className={`admin-pill ${statusColor(o.status)}`}>{o.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
 
-        {/* Recent Orders */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>Recent Orders</h3>
-            <button className="admin-btn admin-btn-sm admin-btn-secondary" onClick={() => nav('orders')}>View All</button>
+        {/* Promo Banner Card matching base. Manage your orders */}
+        <div style={{
+          background: 'linear-gradient(135deg, #1E1209 0%, #3A2315 100%)',
+          borderRadius: '12px',
+          padding: '24px 32px',
+          color: '#F5E6CC',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 8px 24px rgba(30, 18, 9, 0.15)',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}>
+          <div>
+            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '20px', fontWeight: '700', color: '#D4A96A', margin: '0 0 6px 0' }}>
+              base.
+            </h3>
+            <p style={{ fontSize: '13px', margin: 0, color: 'rgba(245, 230, 204, 0.8)' }}>
+              Manage your inventory, warehouse, shipping, and invoices seamlessly in one unified interface.
+            </p>
           </div>
-          <div className="admin-card-body" style={{ padding: 0, overflowX: 'auto' }}>
-            <table className="admin-table">
-              <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
-              <tbody>
-                {recentOrders.map(o => (
-                  <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => { nav('orders'); setTimeout(() => setSelectedOrder(o), 50); }}>
-                    <td style={{ fontWeight: 600 }}>#{o.id}</td>
-                    <td>{o.customer.name}</td>
-                    <td>{o.items.length} item(s)</td>
-                    <td style={{ fontWeight: 600 }}>{formatCurrency(o.total)}</td>
-                    <td><span className={`admin-pill ${statusColor(o.status)}`}>{o.status.charAt(0).toUpperCase() + o.status.slice(1)}</span></td>
-                    <td style={{ color: 'var(--admin-text-muted)', fontSize: 12 }}>{formatDate(o.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <button 
+            className="admin-btn admin-btn-gold" 
+            style={{ 
+              background: '#D4A96A', 
+              color: '#1E1209', 
+              fontWeight: '700', 
+              border: 'none', 
+              padding: '10px 20px',
+              borderRadius: '6px'
+            }}
+            onClick={() => nav('settings')}
+          >
+            Start Setup — 30 Days Free
+          </button>
         </div>
+
       </div>
     );
   };
