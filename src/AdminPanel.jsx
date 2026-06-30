@@ -19,9 +19,9 @@ import './admin.css';
 // ════════════════════════════════════════════════════════════════
 
 const ROLE_ACCESS = {
-  super_admin: ['dashboard','products','orders','customers','discounts','reviews','content','analytics','admin_management','activity_logs','settings'],
-  manager: ['dashboard','products','orders','customers','discounts','reviews','content','analytics'],
-  staff: ['dashboard','products','orders','reviews'],
+  super_admin: ['dashboard','products','catalogue','orders','customers','discounts','reviews','content','analytics','admin_management','activity_logs','settings'],
+  manager: ['dashboard','products','catalogue','orders','customers','discounts','reviews','content','analytics'],
+  staff: ['dashboard','products','catalogue','orders','reviews'],
   support: ['dashboard','orders','customers','reviews'],
 };
 
@@ -222,6 +222,7 @@ export default function AdminPanel() {
   const [productSearch, setProductSearch] = useState('');
   const [productFilter, setProductFilter] = useState('all');
   const [productPage, setProductPage] = useState(1);
+  const [selectedProducts, setSelectedProducts] = useState([]);
 
   // Order state
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -375,6 +376,7 @@ export default function AdminPanel() {
     { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { section: 'STORE' },
     { key: 'products', icon: Package, label: 'Products', badge: products.filter(p => p.status === 'pending').length || null },
+    { key: 'catalogue', icon: Layers, label: 'Catalogue' },
     { key: 'orders', icon: ShoppingCart, label: 'Orders', badge: orders.filter(o => o.status === 'pending').length || null },
     { key: 'customers', icon: Users, label: 'Customers' },
     { key: 'discounts', icon: Tag, label: 'Discounts' },
@@ -950,6 +952,54 @@ export default function AdminPanel() {
     const perPage = 10;
     const paged = filtered.slice((productPage - 1) * perPage, productPage * perPage);
 
+    const handleSelectAll = (checked) => {
+      if (checked) {
+        setSelectedProducts(paged.map(p => p.id));
+      } else {
+        setSelectedProducts([]);
+      }
+    };
+
+    const handleSelectOne = (id, checked) => {
+      if (checked) {
+        setSelectedProducts(prev => [...prev, id]);
+      } else {
+        setSelectedProducts(prev => prev.filter(pId => pId !== id));
+      }
+    };
+
+    const handleBulkPublish = () => {
+      selectedProducts.forEach(id => {
+        store.updateProduct(id, { status: 'published' });
+      });
+      setSelectedProducts([]);
+      showToast(`${selectedProducts.length} products published`);
+    };
+
+    const handleBulkDraft = () => {
+      selectedProducts.forEach(id => {
+        store.updateProduct(id, { status: 'draft' });
+      });
+      setSelectedProducts([]);
+      showToast(`${selectedProducts.length} products marked as draft`);
+    };
+
+    const handleBulkDelete = () => {
+      setConfirmModal({
+        title: 'Bulk Delete Products',
+        message: `Delete the ${selectedProducts.length} selected products? This action cannot be undone.`,
+        danger: true,
+        onConfirm: () => {
+          selectedProducts.forEach(id => {
+            store.deleteProduct(id);
+          });
+          setSelectedProducts([]);
+          setConfirmModal(null);
+          showToast('Selected products deleted');
+        }
+      });
+    };
+
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
@@ -973,17 +1023,57 @@ export default function AdminPanel() {
             <option value="low_stock">Low Stock ({products.filter(p => p.stock > 0 && p.stock <= p.lowStockThreshold).length})</option>
             <option value="out_of_stock">Out of Stock ({products.filter(p => p.stock === 0).length})</option>
           </select>
+
+          {selectedProducts.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, marginLeft: 'auto', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--admin-text-secondary)' }}>
+                {selectedProducts.length} selected
+              </span>
+              <button className="admin-btn admin-btn-sm admin-btn-secondary" onClick={handleBulkPublish}>Publish</button>
+              <button className="admin-btn admin-btn-sm admin-btn-secondary" onClick={handleBulkDraft}>Draft</button>
+              {(currentAdmin.role === 'super_admin' || currentAdmin.role === 'manager') && (
+                <button className="admin-btn admin-btn-sm admin-btn-danger" onClick={handleBulkDelete}>Delete</button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Products Table */}
         <div className="admin-card">
           <div style={{ overflowX: 'auto' }}>
             <table className="admin-table">
-              <thead><tr><th style={{ width: 50 }}></th><th>Product</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+              <thead>
+                <tr>
+                  <th style={{ width: 40, textAlign: 'center' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={paged.length > 0 && paged.every(p => selectedProducts.includes(p.id))} 
+                      onChange={e => handleSelectAll(e.target.checked)} 
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
+                  <th style={{ width: 50 }}></th>
+                  <th>Product</th>
+                  <th>SKU</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                  <th>Stock</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
               <tbody>
-                {paged.length === 0 && <tr><td colSpan={8}><div className="admin-empty-state">No products found</div></td></tr>}
+                {paged.length === 0 && <tr><td colSpan={9}><div className="admin-empty-state">No products found</div></td></tr>}
                 {paged.map(p => (
-                  <tr key={p.id}>
+                  <tr key={p.id} style={{ background: selectedProducts.includes(p.id) ? 'rgba(192,120,80,0.04)' : 'none' }}>
+                    <td style={{ textAlign: 'center' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedProducts.includes(p.id)} 
+                        onChange={e => handleSelectOne(p.id, e.target.checked)} 
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
                     <td><img src={p.image1} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--admin-border)' }} /></td>
                     <td><div style={{ fontWeight: 600, fontSize: 13 }}>{truncate(p.name, 32)}</div>{p.featured && <span style={{ fontSize: 10, color: '#D4A96A' }}>★ Featured</span>}</td>
                     <td style={{ fontSize: 12, color: 'var(--admin-text-muted)', fontFamily: 'monospace' }}>{p.sku || '—'}</td>
@@ -1008,6 +1098,209 @@ export default function AdminPanel() {
             </table>
           </div>
           <div style={{ padding: '0 16px 16px' }}><Pagination page={productPage} total={filtered.length} perPage={perPage} onPageChange={setProductPage} /></div>
+        </div>
+      </div>
+    );
+  };
+
+  // ════════════════════════════════════════════════════════════════
+  // CATALOGUE / CATEGORY MANAGEMENT
+  // ════════════════════════════════════════════════════════════════
+
+  const renderCatalogue = () => {
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [newSubcategoryName, setNewSubcategoryName] = useState('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+    const [editingCatId, setEditingCatId] = useState(null);
+    const [editingCatName, setEditingCatName] = useState('');
+
+    const handleAddCategory = () => {
+      if (!newCategoryName.trim()) return;
+      store.addCategory({ name: newCategoryName.trim(), subcategories: [] });
+      setNewCategoryName('');
+      showToast('Category added successfully!');
+    };
+
+    const handleAddSubcategory = (catId) => {
+      if (!newSubcategoryName.trim()) return;
+      const cat = store.categories.find(c => c.id === catId);
+      if (cat) {
+        const updatedSubs = [...cat.subcategories, newSubcategoryName.trim()];
+        store.updateCategory(catId, { subcategories: updatedSubs });
+        setNewSubcategoryName('');
+        showToast('Subcategory added!');
+      }
+    };
+
+    const handleDeleteSubcategory = (catId, subName) => {
+      const cat = store.categories.find(c => c.id === catId);
+      if (cat) {
+        const updatedSubs = cat.subcategories.filter(s => s !== subName);
+        store.updateCategory(catId, { subcategories: updatedSubs });
+        showToast('Subcategory removed');
+      }
+    };
+
+    const handleSaveCategoryEdit = (catId) => {
+      if (!editingCatName.trim()) return;
+      store.updateCategory(catId, { name: editingCatName.trim() });
+      setEditingCatId(null);
+      showToast('Category renamed');
+    };
+
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>Catalogue & Categories</h2>
+            <p style={{ fontSize: 13, color: 'var(--admin-text-secondary)', marginTop: 4 }}>Manage product categories and sub-categories</p>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+          {/* Categories List */}
+          <div className="admin-card">
+            <div className="admin-card-header">
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>All Categories</h3>
+            </div>
+            <div className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Add Category Form */}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <input 
+                  className="admin-input" 
+                  value={newCategoryName} 
+                  onChange={e => setNewCategoryName(e.target.value)} 
+                  placeholder="New category name..." 
+                />
+                <button className="admin-btn admin-btn-primary" onClick={handleAddCategory} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Plus size={16} /> Add Category
+                </button>
+              </div>
+
+              {/* Categories Table */}
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Subcategories</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {store.categories.map(cat => (
+                    <tr 
+                      key={cat.id} 
+                      style={{ cursor: 'pointer', background: selectedCategoryId === cat.id ? 'rgba(192,120,80,0.06)' : 'none' }}
+                      onClick={() => setSelectedCategoryId(cat.id)}
+                    >
+                      <td>{cat.id}</td>
+                      <td>
+                        {editingCatId === cat.id ? (
+                          <div style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
+                            <input 
+                              className="admin-input admin-input-sm" 
+                              value={editingCatName} 
+                              onChange={e => setEditingCatName(e.target.value)} 
+                              style={{ padding: '4px 8px' }}
+                            />
+                            <button className="admin-btn-icon" onClick={() => handleSaveCategoryEdit(cat.id)}><Check size={14} /></button>
+                          </div>
+                        ) : (
+                          <span style={{ fontWeight: 600 }}>{cat.name}</span>
+                        )}
+                      </td>
+                      <td>{cat.subcategories?.length || 0} items</td>
+                      <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button className="admin-btn-icon" title="Edit" onClick={() => { setEditingCatId(cat.id); setEditingCatName(cat.name); }}><Edit3 size={14} /></button>
+                          <button 
+                            className="admin-btn-icon" 
+                            title="Delete" 
+                            onClick={() => setConfirmModal({ 
+                              title: 'Delete Category', 
+                              message: `Delete category "${cat.name}"? This will delete all subcategories.`, 
+                              danger: true, 
+                              onConfirm: () => { store.deleteCategory(cat.id); setConfirmModal(null); setSelectedCategoryId(null); showToast('Category deleted'); } 
+                            })}
+                          >
+                            <Trash2 size={14} color="#DC3545" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Subcategories Panel */}
+          <div className="admin-card">
+            <div className="admin-card-header">
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--admin-text)', margin: 0 }}>
+                {selectedCategoryId 
+                  ? `Subcategories of "${store.categories.find(c => c.id === selectedCategoryId)?.name}"` 
+                  : 'Select a category to view subcategories'
+                }
+              </h3>
+            </div>
+            <div className="admin-card-body">
+              {selectedCategoryId ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Add Subcategory */}
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <input 
+                      className="admin-input" 
+                      value={newSubcategoryName} 
+                      onChange={e => setNewSubcategoryName(e.target.value)} 
+                      placeholder="New subcategory name..." 
+                    />
+                    <button className="admin-btn admin-btn-primary" onClick={() => handleAddSubcategory(selectedCategoryId)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Plus size={16} /> Add Subcategory
+                    </button>
+                  </div>
+
+                  {/* Subcategories list */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {(store.categories.find(c => c.id === selectedCategoryId)?.subcategories || []).map(sub => (
+                      <div 
+                        key={sub} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between', 
+                          padding: '10px 14px', 
+                          borderRadius: 8, 
+                          background: 'var(--admin-bg)', 
+                          border: '1px solid var(--admin-border)' 
+                        }}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--admin-text)' }}>{sub}</span>
+                        <button 
+                          className="admin-btn-icon" 
+                          onClick={() => handleDeleteSubcategory(selectedCategoryId, sub)}
+                          style={{ color: 'var(--admin-danger)' }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    {(store.categories.find(c => c.id === selectedCategoryId)?.subcategories || []).length === 0 && (
+                      <div className="admin-empty-state" style={{ padding: 32 }}>
+                        <p style={{ color: 'var(--admin-text-muted)', fontSize: 13 }}>No subcategories found. Add one above.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="admin-empty-state" style={{ padding: 60 }}>
+                  <Layers size={32} color="var(--admin-text-muted)" style={{ marginBottom: 12 }} />
+                  <p style={{ color: 'var(--admin-text-secondary)', fontSize: 13 }}>Choose a category from the left table to edit its subcategories.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -1861,6 +2154,7 @@ export default function AdminPanel() {
     switch (adminPage) {
       case 'dashboard': return renderDashboard();
       case 'products': return renderProducts();
+      case 'catalogue': return renderCatalogue();
       case 'orders': return renderOrders();
       case 'customers': return renderCustomers();
       case 'discounts': return renderDiscounts();

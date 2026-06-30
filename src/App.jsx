@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useStore } from './StoreContext';
+import UserAccount from './UserAccount';
+import './user-account.css';
 import { 
   ShoppingBag, Heart, Search, User, Menu, X, ChevronLeft, ChevronRight, 
   Star, ArrowRight, Check, Plus, Minus, ArrowUp, Compass, 
-  ChevronDown, Award
+  ChevronDown, Award, LogOut, AlertCircle
 } from 'lucide-react';
 
 // ============================================================================
@@ -574,12 +576,29 @@ let toastCounter = 0;
 let cartIdCounter = 0;
 
 export default function MothersCraft() {
-  const { products, settings, addOrder, coupons, setActiveTab } = useStore();
+  const {
+    products, settings, addOrder, coupons, setActiveTab,
+    currentUser, userLogin, userRegister, userLogout, updateUserProfile
+  } = useStore();
   const PRODUCTS = products.filter(p => p.status === 'published');
 
   // ============================================================================
   // 2. CENTRAL STATE ENGINE
   // ============================================================================
+
+  // User Auth States
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authTab, setAuthTab] = useState('login'); // 'login' | 'register'
+  const [authError, setAuthError] = useState('');
+  const [authSuccess, setAuthSuccess] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [registerName, setRegisterName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [registerConfirm, setRegisterConfirm] = useState('');
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   // Core Arrays (No localStorage or sessionStorage)
   const [cartItems, setCartItems] = useState([]);
@@ -1164,13 +1183,44 @@ export default function MothersCraft() {
               )}
             </button>
 
-            <button 
-              onClick={() => setActiveTab('admin')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '6px' }}
-              aria-label="Account Profile"
-            >
-              <User size={20} />
-            </button>
+            {currentUser ? (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  className="ua-header-user-btn"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <div className="ua-header-avatar-sm">{currentUser.avatar}</div>
+                  <span className="desktop-only" style={{ fontSize: '13px', fontWeight: '600', color: 'var(--espresso)' }}>{currentUser.name.split(' ')[0]}</span>
+                </button>
+                {showUserDropdown && (
+                  <div className="ua-header-dropdown">
+                    <div className="ua-header-dropdown-header">
+                      <div className="ua-header-dropdown-name">{currentUser.name}</div>
+                      <div className="ua-header-dropdown-email">{currentUser.email}</div>
+                    </div>
+                    <button className="ua-header-dropdown-item" onClick={() => { setView({ page: 'account', productId: null }); setShowUserDropdown(false); }}>
+                      <User size={14} style={{ marginRight: 6 }} /> My Account
+                    </button>
+                    <button className="ua-header-dropdown-item" onClick={() => { setActiveTab('admin'); setShowUserDropdown(false); }}>
+                      <Award size={14} style={{ marginRight: 6 }} /> Admin Panel
+                    </button>
+                    <div className="ua-header-dropdown-divider"></div>
+                    <button className="ua-header-dropdown-item danger" onClick={() => { userLogout(); setView({ page: 'home', productId: null }); setShowUserDropdown(false); }}>
+                      <LogOut size={14} style={{ marginRight: 6 }} /> Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button 
+                onClick={() => { setAuthTab('login'); setAuthModalOpen(true); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '6px' }}
+                aria-label="Account Login"
+              >
+                <User size={20} />
+              </button>
+            )}
 
             <button 
               onClick={() => setCartOpen(true)}
@@ -3628,10 +3678,11 @@ export default function MothersCraft() {
               {/* Checkout buttons */}
               <button 
                 onClick={() => {
-                  setCheckoutName("");
-                  setCheckoutEmail("");
-                  setCheckoutPhone("");
-                  setCheckoutAddress("");
+                  setCheckoutName(currentUser?.name || "");
+                  setCheckoutEmail(currentUser?.email || "");
+                  setCheckoutPhone(currentUser?.phone || "");
+                  const defaultAddr = currentUser?.addresses?.find(a => a.isDefault) || currentUser?.addresses?.[0];
+                  setCheckoutAddress(defaultAddr ? `${defaultAddr.line1}${defaultAddr.line2 ? ', ' + defaultAddr.line2 : ''}, ${defaultAddr.city}, ${defaultAddr.state} - ${defaultAddr.pincode}` : "");
                   setCheckoutOpen(true);
                 }}
                 className="btn-base btn-primary"
@@ -3664,6 +3715,203 @@ export default function MothersCraft() {
             </div>
           )}
 
+        </div>
+      </div>
+    );
+  };
+
+  // Customer Auth Modal Component
+  const renderAuthModal = () => {
+    if (!authModalOpen) return null;
+
+    const handleLoginSubmit = (e) => {
+      e.preventDefault();
+      setAuthError('');
+      setAuthSuccess('');
+      if (!loginEmail || !loginPassword) {
+        setAuthError('Please enter both email and password.');
+        return;
+      }
+      const res = userLogin(loginEmail, loginPassword);
+      if (res.success) {
+        setAuthSuccess('Logged in successfully!');
+        setTimeout(() => {
+          setAuthModalOpen(false);
+          setView({ page: 'account', productId: null });
+          setLoginEmail('');
+          setLoginPassword('');
+          setAuthSuccess('');
+        }, 1000);
+      } else {
+        setAuthError(res.error);
+      }
+    };
+
+    const handleRegisterSubmit = (e) => {
+      e.preventDefault();
+      setAuthError('');
+      setAuthSuccess('');
+      if (!registerName || !registerEmail || !registerPassword || !registerConfirm) {
+        setAuthError('Please fill in all required fields.');
+        return;
+      }
+      if (registerPassword !== registerConfirm) {
+        setAuthError('Passwords do not match.');
+        return;
+      }
+      const res = userRegister({
+        name: registerName,
+        email: registerEmail,
+        phone: registerPhone,
+        password: registerPassword
+      });
+      if (res.success) {
+        setAuthSuccess('Account registered successfully! Welcome to Mothers Craft.');
+        setTimeout(() => {
+          setAuthModalOpen(false);
+          setView({ page: 'account', productId: null });
+          setRegisterName('');
+          setRegisterEmail('');
+          setRegisterPhone('');
+          setRegisterPassword('');
+          setRegisterConfirm('');
+          setAuthSuccess('');
+        }, 1200);
+      } else {
+        setAuthError(res.error);
+      }
+    };
+
+    return (
+      <div className="ua-auth-overlay" onClick={() => setAuthModalOpen(false)}>
+        <div className="ua-auth-modal" onClick={e => e.stopPropagation()}>
+          <div className="ua-auth-header">
+            <h2 className="ua-auth-title">Mothers Craft</h2>
+            <button className="ua-auth-close" onClick={() => setAuthModalOpen(false)}>
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="ua-auth-tabs">
+            <button 
+              className={`ua-auth-tab ${authTab === 'login' ? 'active' : ''}`}
+              onClick={() => { setAuthTab('login'); setAuthError(''); }}
+            >
+              Sign In
+            </button>
+            <button 
+              className={`ua-auth-tab ${authTab === 'register' ? 'active' : ''}`}
+              onClick={() => { setAuthTab('register'); setAuthError(''); }}
+            >
+              Register
+            </button>
+          </div>
+
+          <div className="ua-auth-body">
+            {authError && (
+              <div className="ua-auth-error">
+                <AlertCircle size={16} /> {authError}
+              </div>
+            )}
+            {authSuccess && (
+              <div className="ua-auth-success">
+                {authSuccess}
+              </div>
+            )}
+
+            {authTab === 'login' ? (
+              <form onSubmit={handleLoginSubmit}>
+                <div className="ua-demo-creds">
+                  <strong>Demo Login:</strong> aarti.r@gmail.com / user123
+                </div>
+                <div className="ua-form-group">
+                  <label className="ua-form-label">Email Address</label>
+                  <input 
+                    type="email" 
+                    className="ua-form-input" 
+                    value={loginEmail} 
+                    onChange={e => setLoginEmail(e.target.value)} 
+                    placeholder="Enter email"
+                    required
+                  />
+                </div>
+                <div className="ua-form-group">
+                  <label className="ua-form-label">Password</label>
+                  <input 
+                    type="password" 
+                    className="ua-form-input" 
+                    value={loginPassword} 
+                    onChange={e => setLoginPassword(e.target.value)} 
+                    placeholder="Enter password"
+                    required
+                  />
+                </div>
+                <button type="submit" className="ua-btn ua-btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}>
+                  Sign In
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleRegisterSubmit}>
+                <div className="ua-form-group">
+                  <label className="ua-form-label">Full Name *</label>
+                  <input 
+                    type="text" 
+                    className="ua-form-input" 
+                    value={registerName} 
+                    onChange={e => setRegisterName(e.target.value)} 
+                    placeholder="Enter full name"
+                    required
+                  />
+                </div>
+                <div className="ua-form-group">
+                  <label className="ua-form-label">Email Address *</label>
+                  <input 
+                    type="email" 
+                    className="ua-form-input" 
+                    value={registerEmail} 
+                    onChange={e => setRegisterEmail(e.target.value)} 
+                    placeholder="Enter email"
+                    required
+                  />
+                </div>
+                <div className="ua-form-group">
+                  <label className="ua-form-label">Phone Number</label>
+                  <input 
+                    type="text" 
+                    className="ua-form-input" 
+                    value={registerPhone} 
+                    onChange={e => setRegisterPhone(e.target.value)} 
+                    placeholder="+91 XXXXX XXXXX"
+                  />
+                </div>
+                <div className="ua-form-group">
+                  <label className="ua-form-label">Password *</label>
+                  <input 
+                    type="password" 
+                    className="ua-form-input" 
+                    value={registerPassword} 
+                    onChange={e => setRegisterPassword(e.target.value)} 
+                    placeholder="Min 6 characters"
+                    required
+                  />
+                </div>
+                <div className="ua-form-group">
+                  <label className="ua-form-label">Confirm Password *</label>
+                  <input 
+                    type="password" 
+                    className="ua-form-input" 
+                    value={registerConfirm} 
+                    onChange={e => setRegisterConfirm(e.target.value)} 
+                    placeholder="Re-enter password"
+                    required
+                  />
+                </div>
+                <button type="submit" className="ua-btn ua-btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}>
+                  Create Account
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -4578,6 +4826,21 @@ export default function MothersCraft() {
           )}
           <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' }}>Cart</span>
         </button>
+
+        <button 
+          onClick={() => {
+            if (currentUser) {
+              setView({ page: 'account', productId: null });
+            } else {
+              setAuthTab('login');
+              setAuthModalOpen(true);
+            }
+          }}
+          style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer' }}
+        >
+          <User size={20} style={{ color: view.page === 'account' ? 'var(--mahogany)' : 'var(--text-muted)' }} />
+          <span style={{ fontSize: '10px', color: view.page === 'account' ? 'var(--mahogany)' : 'var(--text-muted)', fontWeight: '600' }}>Account</span>
+        </button>
       </div>
     );
   };
@@ -4701,6 +4964,21 @@ export default function MothersCraft() {
       {view.page === 'product' ? (
         // Product detailed subpage
         renderProductDetailView(view.productId)
+      ) : view.page === 'account' ? (
+        // Customer account subpage
+        <UserAccount 
+          onNavigateHome={() => setView({ page: 'home', productId: null })}
+          wishlistItems={wishlistItems.map(id => ({ id }))}
+          onMoveToCart={(product) => {
+            triggerAddToCart(product, null, null, 1);
+            setWishlistItems(prev => prev.filter(id => id !== product.id));
+            addToast(`${product.name} moved to cart!`);
+          }}
+          onRemoveFromWishlist={(id) => {
+            setWishlistItems(prev => prev.filter(item => item !== id));
+            addToast("Item removed from wishlist");
+          }}
+        />
       ) : (
         // Standard full homepage flow
         <>
@@ -4799,6 +5077,9 @@ export default function MothersCraft() {
 
       {/* Checkout overlay modal */}
       {renderCheckoutModal()}
+
+      {/* Customer authentication modal */}
+      {renderAuthModal()}
 
       {/* Layout mobile fixes padding bottom to clear fixed bottom side nav bar and responsive grid overrides */}
       <style>{`

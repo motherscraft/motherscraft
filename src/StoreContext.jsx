@@ -92,6 +92,24 @@ const SEED_ACTIVITY_LOGS = [
   { id: 10, adminId: 1, adminName: "Priya Motherscraft", role: "super_admin", action: "settings_update", details: "Updated shipping rate for 'Rest of India' zone to ₹49", ip: "49.36.12.xxx", timestamp: "2026-06-15 17:20" },
 ];
 
+const SEED_USERS = [
+  { id: 1, name: "Aarti Raghavan", email: "aarti.r@gmail.com", password: "user123", phone: "+91 98765 43210", avatar: "AR", joined: "2026-01-20", addresses: [
+    { id: 1, label: "Home", name: "Aarti Raghavan", phone: "+91 98765 43210", line1: "42, MG Road", line2: "Indiranagar", city: "Bangalore", state: "Karnataka", pincode: "560038", isDefault: true },
+    { id: 2, label: "Office", name: "Aarti Raghavan", phone: "+91 98765 43210", line1: "Tech Park, 5th Floor", line2: "Whitefield", city: "Bangalore", state: "Karnataka", pincode: "560066", isDefault: false }
+  ]},
+  { id: 2, name: "Simran Dhawan", email: "simran.d@outlook.com", password: "user123", phone: "+91 87654 32109", avatar: "SD", joined: "2026-03-12", addresses: [
+    { id: 1, label: "Home", name: "Simran Dhawan", phone: "+91 87654 32109", line1: "15, Park Street", line2: "Salt Lake", city: "Kolkata", state: "West Bengal", pincode: "700091", isDefault: true }
+  ]},
+  { id: 3, name: "Pooja Kulkarni", email: "pooja.k@yahoo.com", password: "user123", phone: "+91 76543 21098", avatar: "PK", joined: "2026-02-28", addresses: [
+    { id: 1, label: "Home", name: "Pooja Kulkarni", phone: "+91 76543 21098", line1: "8, FC Road", line2: "Shivajinagar", city: "Pune", state: "Maharashtra", pincode: "411004", isDefault: true }
+  ]},
+  { id: 4, name: "Ravi Sharma", email: "ravi.s@gmail.com", password: "user123", phone: "+91 54321 09876", avatar: "RS", joined: "2026-05-01", addresses: []},
+  { id: 5, name: "Meera Patel", email: "meera.p@hotmail.com", password: "user123", phone: "+91 43210 98765", avatar: "MP", joined: "2026-03-22", addresses: []},
+];
+
+let nextUserId = 6;
+let nextAddressId = 10;
+
 const INITIAL_SETTINGS = {
   storeName: "Mothers Craft",
   tagline: "Crafted with Love, Made for You",
@@ -144,10 +162,14 @@ export function StoreProvider({ children }) {
   const [adminUsers, setAdminUsers] = useState(SEED_ADMIN_USERS);
   const [activityLogs, setActivityLogs] = useState(SEED_ACTIVITY_LOGS);
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
-  const [categories] = useState(CATEGORIES);
+  const [categories, setCategories] = useState(CATEGORIES);
   const [currentAdmin, setCurrentAdmin] = useState(null);
   const [activeTab, setActiveTab] = useState('storefront');
   const [notifications, setNotifications] = useState([]);
+
+  // ── User Account State ──
+  const [users, setUsers] = useState(SEED_USERS);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Generate notifications from data
   const generateNotifications = useCallback(() => {
@@ -343,6 +365,137 @@ export function StoreProvider({ children }) {
     logActivity('settings_update', `Updated store settings`);
   }, [logActivity]);
 
+  // ════════════════════════════════════════════════════════════════
+  // USER ACCOUNT FUNCTIONS
+  // ════════════════════════════════════════════════════════════════
+
+  const userLogin = useCallback((email, password) => {
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+    if (user) {
+      setCurrentUser(user);
+      return { success: true, user };
+    }
+    return { success: false, error: 'Invalid email or password' };
+  }, [users]);
+
+  const userRegister = useCallback((userData) => {
+    const exists = users.find(u => u.email.toLowerCase() === userData.email.toLowerCase());
+    if (exists) return { success: false, error: 'An account with this email already exists' };
+    const newUser = {
+      id: nextUserId++,
+      name: userData.name,
+      email: userData.email,
+      password: userData.password,
+      phone: userData.phone || '',
+      avatar: userData.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
+      joined: new Date().toISOString().split('T')[0],
+      addresses: [],
+    };
+    setUsers(prev => [...prev, newUser]);
+    setCurrentUser(newUser);
+    return { success: true, user: newUser };
+  }, [users]);
+
+  const userLogout = useCallback(() => {
+    setCurrentUser(null);
+  }, []);
+
+  const updateUserProfile = useCallback((updates) => {
+    if (!currentUser) return;
+    const updated = { ...currentUser, ...updates };
+    setCurrentUser(updated);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+  }, [currentUser]);
+
+  // ── User Addresses ──
+  const addUserAddress = useCallback((address) => {
+    if (!currentUser) return;
+    const newAddr = { ...address, id: nextAddressId++ };
+    // If first address or marked default, unset others
+    const updatedAddresses = currentUser.addresses.length === 0 || newAddr.isDefault
+      ? [...currentUser.addresses.map(a => ({ ...a, isDefault: false })), { ...newAddr, isDefault: true }]
+      : [...currentUser.addresses, newAddr];
+    const updated = { ...currentUser, addresses: updatedAddresses };
+    setCurrentUser(updated);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+  }, [currentUser]);
+
+  const updateUserAddress = useCallback((addressId, updates) => {
+    if (!currentUser) return;
+    let updatedAddresses = currentUser.addresses.map(a => a.id === addressId ? { ...a, ...updates } : a);
+    if (updates.isDefault) {
+      updatedAddresses = updatedAddresses.map(a => ({ ...a, isDefault: a.id === addressId }));
+    }
+    const updated = { ...currentUser, addresses: updatedAddresses };
+    setCurrentUser(updated);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+  }, [currentUser]);
+
+  const deleteUserAddress = useCallback((addressId) => {
+    if (!currentUser) return;
+    let updatedAddresses = currentUser.addresses.filter(a => a.id !== addressId);
+    // If deleted address was default, make first one default
+    if (updatedAddresses.length > 0 && !updatedAddresses.some(a => a.isDefault)) {
+      updatedAddresses[0].isDefault = true;
+    }
+    const updated = { ...currentUser, addresses: updatedAddresses };
+    setCurrentUser(updated);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+  }, [currentUser]);
+
+  // ── User Orders (get orders for current user by email) ──
+  const getUserOrders = useCallback(() => {
+    if (!currentUser) return [];
+    return orders.filter(o => o.customer.email.toLowerCase() === currentUser.email.toLowerCase()).sort((a, b) => b.id - a.id);
+  }, [currentUser, orders]);
+
+  // ── User Reviews ──
+  const getUserReviews = useCallback(() => {
+    if (!currentUser) return [];
+    return reviews.filter(r => {
+      const cust = customers.find(c => c.email.toLowerCase() === currentUser.email.toLowerCase());
+      return cust && r.customerId === cust.id;
+    });
+  }, [currentUser, reviews, customers]);
+
+  const submitUserReview = useCallback((productId, rating, text) => {
+    if (!currentUser) return;
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    const newReview = {
+      id: nextReviewId++,
+      customerId: currentUser.id,
+      customerName: currentUser.name.split(' ')[0] + ' ' + currentUser.name.split(' ').slice(-1)[0][0] + '.',
+      productId,
+      productName: product.name,
+      rating,
+      text,
+      date: new Date().toISOString().split('T')[0],
+      status: 'pending',
+      adminReply: ''
+    };
+    setReviews(prev => [...prev, newReview]);
+  }, [currentUser, products]);
+
+  // ── Categories CRUD (for admin catalogue management) ──
+  const addCategory = useCallback((category) => {
+    const newCat = { id: categories.length + 1, name: category.name, subcategories: category.subcategories || [] };
+    setCategories(prev => [...prev, newCat]);
+    logActivity('category_create', `Added category '${category.name}'`);
+    return newCat;
+  }, [categories, logActivity]);
+
+  const updateCategory = useCallback((id, updates) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    logActivity('category_update', `Updated category ID #${id}`);
+  }, [logActivity]);
+
+  const deleteCategory = useCallback((id) => {
+    const cat = categories.find(c => c.id === id);
+    setCategories(prev => prev.filter(c => c.id !== id));
+    if (cat) logActivity('category_delete', `Deleted category '${cat.name}'`);
+  }, [categories, logActivity]);
+
   // ── Stock ──
   const updateStock = useCallback((productId, newStock) => {
     const product = products.find(p => p.id === productId);
@@ -361,6 +514,11 @@ export function StoreProvider({ children }) {
     addAdminUser, updateAdminUser, deleteAdminUser,
     updateSettings, logActivity,
     activeTab, setActiveTab,
+    // User Account
+    currentUser, users, userLogin, userRegister, userLogout, updateUserProfile,
+    addUserAddress, updateUserAddress, deleteUserAddress,
+    getUserOrders, getUserReviews, submitUserReview,
+    addCategory, updateCategory, deleteCategory,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
